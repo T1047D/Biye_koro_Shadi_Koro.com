@@ -1,5 +1,5 @@
 /*
-  Biye Koro Shadi Koro — Static edition
+  Biye Koro Shadi Koro.com — Static edition
   EDIT PROFILES, CONTACT DETAILS AND SECTION SETTINGS IN THIS FILE.
   No database, API, login, backend or online profile submission is used.
 */
@@ -7,28 +7,28 @@
 const SITE_SETTINGS = {
   showBrides: true,
   showGrooms: true,
-  administratorWhatsApp: "8801XXXXXXXXX", // Replace with your WhatsApp number, including country code
-  administratorEmail: "hello@example.com" // Replace with your email address
+  administratorWhatsApp: "+8801928860786", // Replace with your WhatsApp number, including country code
+  administratorEmail: "kh4892001@gmail.com" // Replace with your email address
 };
 
 // Add, edit or remove profiles directly in this array.
 // Photo paths should point to image files inside the project, e.g. "images/ayesha.jpg".
 const PROFILES = [
   {
-    id: 1, type: "bride", name: "Ayesha Rahman", age: 24, height: "5'3\"",
-    district: "Dhaka", education: "BBA", profession: "Teacher",
+    id: 1, type: "bride", name: "Tamanna Vat", age: 24, height: "5'3\"",
+    district: "Delhi", education: "BBA", profession: "Actor",
     marital: "Never married", family: "Educated, close-knit family",
     about: "A warm, thoughtful person who values kindness, family and lifelong learning. Enjoys reading, travel and spending time with loved ones.",
     preference: "Kind, respectful, emotionally mature and family-oriented. Stable career and a willingness to grow together.",
-    photo: "", income: "Not specified"
+    photo: "tamannavat.jpg", income: "Not specified"
   },
   {
-    id: 2, type: "bride", name: "Nusrat Jahan", age: 26, height: "5'4\"",
-    district: "Chattogram", education: "MBBS", profession: "Doctor",
-    marital: "Never married", family: "Supportive professional family",
+    id: 2, type: "bride", name: "Morium Tanha", age: 19, height: "5'4\"",
+    district: "Chuadanga", education: "Hsc", profession: "Student",
+    marital: "Never married", family: "Supportive professional Rich family",
     about: "Curious, compassionate and career-minded. Believes a good relationship is built on mutual respect and honest communication.",
     preference: "Educated, responsible and supportive of each other's ambitions.",
-    photo: "", income: "Not specified"
+    photo: "morium.jpg", income: "Not specified"
   },
   {
     id: 3, type: "bride", name: "Maliha Islam", age: 23, height: "5'2\"",
