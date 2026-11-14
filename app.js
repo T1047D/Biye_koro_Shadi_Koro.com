@@ -23,7 +23,7 @@ const PROFILES = [
     photo: "tamannavat.jpg", income: "Not specified"
   },
   {
-    id: 2, type: "bride", name: "Morium Tanha", age: 19, height: "5'4\"",
+    id: 2, type: "bride", name: "Laila", age: 19, height: "5'4\"",
     district: "Chuadanga", education: "Hsc", profession: "Student",
     marital: "Never married", family: "Supportive professional Rich family",
     about: "Curious, compassionate and career-minded. Believes a good relationship is built on mutual respect and honest communication.",
