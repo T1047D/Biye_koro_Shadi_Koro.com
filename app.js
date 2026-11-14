@@ -139,7 +139,6 @@ function render() {
   $("profileGrid").innerHTML = list.map(p => `
     <article class="profile-card">
       <div class="profile-visual ${p.type}">
-        <span class="profile-badge">${p.type === "bride" ? "BRIDE PROFILE" : "GROOM PROFILE"}</span>
         <button class="fav-btn ${favorites.has(p.id) ? "saved" : ""}" data-fav="${p.id}" aria-label="Save ${escapeHTML(p.name)}">${favorites.has(p.id) ? "♥" : "♡"}</button>
         ${p.photo ? `<img src="${escapeHTML(p.photo)}" alt="${escapeHTML(p.name)}" loading="lazy">` : `<div class="avatar">${p.type === "bride" ? "👩🏻" : "👨🏻"}</div>`}
       </div>
