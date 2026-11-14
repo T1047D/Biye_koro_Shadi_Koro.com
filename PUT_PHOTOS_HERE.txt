@@ -1,0 +1,1 @@
+Place profile photos in this folder and set each profile's photo path in app.js.
