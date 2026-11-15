@@ -897,8 +897,9 @@ adminProfileRows.addEventListener("click", async event => {
 // PROFILE GRID EVENTS
 // ==========================================
 
-profileGrid.addEventListener("click", event => {
-  const viewButton = event.target.closest("[data-view]");
+
+profileGrid.addEventListener("click", async event => {
+
   const favoriteButton = event.target.closest("[data-fav]");
 
   if (favoriteButton) {
@@ -906,10 +907,57 @@ profileGrid.addEventListener("click", event => {
     return;
   }
 
+  const editButton = event.target.closest("[data-card-edit]");
+
+  if (editButton) {
+    if (!isAdmin()) return;
+
+    const profile = PROFILES.find(
+      p => String(p.id) === String(editButton.dataset.cardEdit)
+    );
+
+    if (profile) {
+      openProfileForm(profile);
+    }
+
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-card-delete]");
+
+  if (deleteButton) {
+    if (!isAdmin()) return;
+
+    const id = deleteButton.dataset.cardDelete;
+
+    const profile = PROFILES.find(
+      p => String(p.id) === String(id)
+    );
+
+    if (!profile) return;
+
+    if (!confirm(`Are you sure you want to delete ${profile.name}?`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "profiles", String(id)));
+      alert("Profile deleted successfully!");
+    } catch (error) {
+      alert("Delete failed: " + error.message);
+    }
+
+    return;
+  }
+
+  const viewButton = event.target.closest("[data-view]");
+
   if (viewButton) {
     openProfile(viewButton.dataset.view);
   }
+
 });
+
 
 // ==========================================
 // PROFILE MODAL CLOSE
