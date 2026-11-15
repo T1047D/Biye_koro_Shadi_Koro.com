@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -17,12 +18,18 @@
       <span class="brand-mark">💍</span>
       <span><strong>Biye Koro</strong><small>SHADI KORO.com</small></span>
     </a>
+
     <nav class="main-nav">
       <a href="#browse">Browse profiles</a>
       <a href="#about">About</a>
       <a href="#contact">Contact</a>
     </nav>
-    <a class="header-cta" href="#browse">Find a match <span>↗</span></a>
+
+    <div class="header-actions">
+      <a class="header-cta" href="#browse">Find a match <span>↗</span></a>
+      <button class="admin-open-btn" id="adminOpenBtn">Admin</button>
+    </div>
+
     <button class="menu-toggle" id="menuToggle" aria-label="Open menu">☰</button>
   </header>
 
@@ -38,6 +45,7 @@
         </div>
         <div class="hero-note"><span>♡</span> Made for meaningful connections in Bangladesh</div>
       </div>
+
       <div class="hero-art" aria-label="Decorative wedding illustration">
         <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
         <div class="art-card card-back"></div>
@@ -77,11 +85,11 @@
         <label>District<select id="districtFilter"><option value="">All districts</option></select></label>
         <label>Education<select id="educationFilter"><option value="">All education</option></select></label>
         <label>Age range<select id="ageFilter"><option value="">Any age</option><option value="18-24">18–24</option><option value="25-29">25–29</option><option value="30-34">30–34</option><option value="35-60">35+</option></select></label>
-        <label>Marital status<select id="maritalFilter"><option value="">Any status</option><option>Never married</option><option>Divorced</option><option>Widowed</option></select></label>
+        <label>Marital status<select id="maritalFilter"><option value="">Any status</option><option>Never married</option><option>Divorced</option><option>Widowed</option><option>Unmarried / Single</option></select></label>
         <button class="reset-btn" id="resetFilters">Reset filters</button>
       </div>
 
-      <div class="results-line"><span id="resultCount">0 profiles</span><span>Curated sample profiles</span></div>
+      <div class="results-line"><span id="resultCount">0 profiles</span><span>Curated profiles</span></div>
       <div class="profile-grid" id="profileGrid"></div>
       <div class="empty-state hidden" id="emptyState"><div>♡</div><h3>No profiles found</h3><p>Try changing your search or filters.</p><button class="btn btn-outline" id="emptyReset">Clear filters</button></div>
     </section>
@@ -104,6 +112,7 @@
     <span class="footer-note">Built for meaningful beginnings ♡</span>
   </footer>
 
+  <!-- Profile details modal -->
   <div class="modal-backdrop hidden" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="modalName">
     <div class="profile-modal">
       <button class="modal-close" id="modalClose" aria-label="Close">×</button>
@@ -111,6 +120,94 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- Admin login modal -->
+  <div class="admin-backdrop hidden" id="adminLoginModal">
+    <div class="admin-box">
+      <button class="modal-close" id="adminLoginClose">×</button>
+      <span class="eyebrow">ADMIN ACCESS</span>
+      <h2>Administrator Login</h2>
+      <p>Sign in with your administrator email and password.</p>
+      <form id="adminLoginForm">
+        <label>Email<input id="adminEmail" type="email" required autocomplete="username"></label>
+        <label>Password<input id="adminPassword" type="password" required autocomplete="current-password"></label>
+        <button class="btn btn-primary" type="submit">Login to Dashboard ↗</button>
+        <p class="admin-message" id="loginMessage"></p>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin dashboard -->
+  <div class="admin-backdrop hidden" id="adminDashboard">
+    <div class="admin-dashboard-box">
+      <div class="admin-dashboard-header">
+        <div>
+          <span class="eyebrow">CONTROL PANEL</span>
+          <h2>Admin Dashboard</h2>
+          <p id="adminWelcome">Manage your matrimonial profiles.</p>
+        </div>
+        <button class="modal-close" id="dashboardClose">×</button>
+      </div>
+
+      <div class="admin-dashboard-actions">
+        <button class="btn btn-primary" id="addProfileBtn">+ Add new profile</button>
+        <button class="btn btn-outline" id="importSamplesBtn">Import sample profiles</button>
+        <button class="admin-logout-btn" id="adminLogoutBtn">Logout</button>
+      </div>
+
+      <p class="admin-message" id="dashboardMessage"></p>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>Type</th><th>District</th><th>Age</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="adminProfileRows"></tbody>
+        </table>
+      </div>
+
+      <form id="profileForm" class="admin-profile-form hidden">
+        <h3 id="profileFormTitle">Add profile</h3>
+        <input type="hidden" id="editProfileId">
+
+        <div class="admin-form-grid">
+          <label>Profile type
+            <select id="formType" required>
+              <option value="bride">Bride</option>
+              <option value="groom">Groom</option>
+            </select>
+          </label>
+
+          <label>Name<input id="formName" required maxlength="100"></label>
+          <label>Age<input id="formAge" type="number" min="18" max="100" required></label>
+          <label>Height<input id="formHeight" placeholder="5'7&quot;"></label>
+          <label>District<input id="formDistrict" required list="districtOptions"></label>
+          <datalist id="districtOptions"></datalist>
+          <label>Education<input id="formEducation" required></label>
+          <label>Profession<input id="formProfession"></label>
+          <label>Marital status
+            <select id="formMarital">
+              <option>Never married</option>
+              <option>Unmarried / Single</option>
+              <option>Divorced</option>
+              <option>Widowed</option>
+            </select>
+          </label>
+          <label>Family background<input id="formFamily"></label>
+          <label>Income<input id="formIncome"></label>
+          <label class="wide-field">Photo path or image URL<input id="formPhoto" placeholder="Assets/photo.jpg or https://..."></label>
+          <label class="wide-field">About<textarea id="formAbout" rows="3"></textarea></label>
+          <label class="wide-field">Expected partner<textarea id="formPreference" rows="3"></textarea></label>
+        </div>
+
+        <div class="admin-form-actions">
+          <button class="btn btn-primary" type="submit" id="saveProfileBtn">Save profile</button>
+          <button class="btn btn-outline" type="button" id="cancelProfileBtn">Cancel</button>
+        </div>
+        <p class="admin-message" id="formMessage"></p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
 </body>
 </html>
