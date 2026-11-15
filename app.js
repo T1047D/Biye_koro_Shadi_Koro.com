@@ -677,6 +677,27 @@ $("profileForm").addEventListener("submit", async event => {
   }
 });
 
+function closeAdminDashboard() {
+  if (adminDashboard) {
+    adminDashboard.classList.remove("active");
+    adminDashboard.classList.add("hidden");
+  }
+}
+
+function openAdminDashboard() {
+  if (!isAdmin) {
+    openAdminLogin();
+    return;
+  }
+
+  if (adminDashboard) {
+    adminDashboard.classList.remove("hidden");
+    adminDashboard.classList.add("active");
+  }
+
+  renderAdminProfiles();
+}
+
 // IMPORT ORIGINAL 3 SAMPLE PROFILES
 if (importSamplesBtn) {
   importSamplesBtn.addEventListener("click", async () => {
