@@ -11,8 +11,8 @@ import {
 import {
   getFirestore,
   collection,
-  getDocs,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   doc,
@@ -40,7 +40,7 @@ const db = getFirestore(firebaseApp);
 const profilesCollection = collection(db, "profiles");
 
 // ==========================================
-// SITE SETTINGS
+// SETTINGS
 // ==========================================
 
 const SITE_SETTINGS = {
@@ -51,12 +51,12 @@ const SITE_SETTINGS = {
 };
 
 // ==========================================
-// ORIGINAL SAMPLE PROFILES
+// ORIGINAL 3 PROFILES
 // ==========================================
 
 const SAMPLE_PROFILES = [
   {
-    id: 1,
+    id: "sample-1",
     type: "bride",
     name: "Sohana Afrin Shefa",
     age: 19,
@@ -72,7 +72,7 @@ const SAMPLE_PROFILES = [
     income: "00"
   },
   {
-    id: 2,
+    id: "sample-2",
     type: "groom",
     name: "Md.Kowsar",
     age: 19,
@@ -88,7 +88,7 @@ const SAMPLE_PROFILES = [
     income: "0"
   },
   {
-    id: 3,
+    id: "sample-3",
     type: "groom",
     name: "Abir Saha",
     age: 19,
@@ -106,34 +106,39 @@ const SAMPLE_PROFILES = [
 ];
 
 // ==========================================
-// FILTER OPTIONS
+// 64 DISTRICTS OF BANGLADESH
 // ==========================================
 
 const ALL_DISTRICTS = [
-  "Bagerhat","Bandarban","Barguna","Barishal","Bhola","Bogura",
-  "Brahmanbaria","Chandpur","Chattogram","Chuadanga","Cox's Bazar",
-  "Cumilla","Dhaka","Dinajpur","Faridpur","Feni","Gaibandha",
-  "Gazipur","Gopalganj","Habiganj","Jamalpur","Jashore","Jhalokati",
-  "Jhenaidah","Joypurhat","Khagrachhari","Khulna","Kishoreganj",
-  "Kurigram","Kushtia","Lakshmipur","Lalmonirhat","Madaripur",
-  "Magura","Manikganj","Meherpur","Moulvibazar","Munshiganj",
-  "Mymensingh","Naogaon","Narail","Narayanganj","Narsingdi",
-  "Natore","Netrokona","Nilphamari","Noakhali","Pabna","Panchagarh",
-  "Patuakhali","Pirojpur","Rajbari","Rajshahi","Rangamati",
-  "Rangpur","Satkhira","Shariatpur","Sherpur","Sirajganj",
-  "Sunamganj","Sylhet","Tangail","Thakurgaon"
+  "Bagerhat", "Bandarban", "Barguna", "Barishal",
+  "Bhola", "Bogura", "Brahmanbaria", "Chandpur",
+  "Chattogram", "Chuadanga", "Cox's Bazar", "Cumilla",
+  "Dhaka", "Dinajpur", "Faridpur", "Feni",
+  "Gaibandha", "Gazipur", "Gopalganj", "Habiganj",
+  "Jamalpur", "Jashore", "Jhalokati", "Jhenaidah",
+  "Joypurhat", "Khagrachhari", "Khulna", "Kishoreganj",
+  "Kurigram", "Kushtia", "Lakshmipur", "Lalmonirhat",
+  "Madaripur", "Magura", "Manikganj", "Meherpur",
+  "Moulvibazar", "Munshiganj", "Mymensingh", "Naogaon",
+  "Narail", "Narayanganj", "Narsingdi", "Natore",
+  "Netrokona", "Nilphamari", "Noakhali", "Pabna",
+  "Panchagarh", "Patuakhali", "Pirojpur", "Rajbari",
+  "Rajshahi", "Rangamati", "Rangpur", "Satkhira",
+  "Shariatpur", "Sherpur", "Sirajganj", "Sunamganj",
+  "Sylhet", "Tangail", "Thakurgaon"
 ];
 
 const ALL_EDUCATION = [
-  "Primary","JSC","SSC","O Level","HSC","A Level","HSC PASS",
-  "Diploma","Vocational","Certificate","Degree","Degree (Pass)",
-  "Honours","Bachelor's","BA","BSc","BBA","BSS","LLB","MBBS",
-  "BDS","Engineering","Master's","MA","MSc","MBA","MSS","LLM",
-  "MPhil","PhD","Others"
+  "Primary", "JSC", "SSC", "O Level", "HSC", "A Level",
+  "HSC PASS", "Diploma", "Vocational", "Certificate",
+  "Degree", "Degree (Pass)", "Honours", "Bachelor's",
+  "BA", "BSc", "BBA", "BSS", "LLB", "MBBS", "BDS",
+  "Engineering", "Master's", "MA", "MSc", "MBA",
+  "MSS", "LLM", "MPhil", "PhD", "Others"
 ];
 
 // ==========================================
-// HELPERS
+// HELPERS AND STATE
 // ==========================================
 
 const $ = id => document.getElementById(id);
@@ -147,7 +152,9 @@ const escapeHTML = value =>
     "'": "&#39;"
   }[ch]));
 
-let PROFILES = [];
+let PROFILES = [...SAMPLE_PROFILES];
+let firestoreProfiles = [];
+let usingSampleFallback = true;
 let currentType = "bride";
 let currentUser = null;
 let unsubscribeProfiles = null;
@@ -160,6 +167,10 @@ try {
   );
 } catch {
   favorites = new Set();
+}
+
+function isAdmin() {
+  return currentUser && currentUser.uid === ADMIN_UID;
 }
 
 // ==========================================
@@ -187,9 +198,9 @@ function updateCounts() {
   $("favoriteCount").textContent = favorites.size;
   $("year").textContent = new Date().getFullYear();
 
-  $("contactButton").href =
-    `https://wa.me/${SITE_SETTINGS.administratorWhatsApp.replace(/\D/g, "")}`;
+  const phone = SITE_SETTINGS.administratorWhatsApp.replace(/\D/g, "");
 
+  $("contactButton").href = `https://wa.me/${phone}`;
   $("contactButton").target = "_blank";
   $("contactButton").rel = "noopener";
 
@@ -206,7 +217,7 @@ function updateCounts() {
 
 function fillFilters() {
   const source = currentType === "favorites"
-    ? visibleProfiles().filter(p => favorites.has(p.id))
+    ? visibleProfiles().filter(p => favorites.has(String(p.id)))
     : visibleProfiles().filter(p => p.type === currentType);
 
   const districts = [...new Set([
@@ -230,6 +241,13 @@ function fillFilters() {
     education.map(v =>
       `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`
     ).join("");
+
+  // District list inside admin profile form
+  if ($("districtOptions")) {
+    $("districtOptions").innerHTML = ALL_DISTRICTS.map(v =>
+      `<option value="${escapeHTML(v)}"></option>`
+    ).join("");
+  }
 }
 
 // ==========================================
@@ -246,7 +264,7 @@ function render() {
   let list = visibleProfiles();
 
   if (currentType === "favorites") {
-    list = list.filter(p => favorites.has(p.id));
+    list = list.filter(p => favorites.has(String(p.id)));
   } else {
     list = list.filter(p => p.type === currentType);
   }
@@ -277,11 +295,11 @@ function render() {
 
   $("profileGrid").innerHTML = list.map(p => `
     <article class="profile-card">
-      <div class="profile-visual ${p.type}">
-        <button class="fav-btn ${favorites.has(p.id) ? "saved" : ""}"
+      <div class="profile-visual ${escapeHTML(p.type)}">
+        <button class="fav-btn ${favorites.has(String(p.id)) ? "saved" : ""}"
           data-fav="${escapeHTML(p.id)}"
           aria-label="Save ${escapeHTML(p.name)}">
-          ${favorites.has(p.id) ? "♥" : "♡"}
+          ${favorites.has(String(p.id)) ? "♥" : "♡"}
         </button>
 
         ${p.photo
@@ -318,7 +336,7 @@ function render() {
 }
 
 // ==========================================
-// FIRESTORE REALTIME PROFILES
+// FIRESTORE REALTIME LISTENER
 // ==========================================
 
 function startProfileListener() {
@@ -327,10 +345,19 @@ function startProfileListener() {
   unsubscribeProfiles = onSnapshot(
     profilesCollection,
     snapshot => {
-      PROFILES = snapshot.docs.map(item => ({
+      firestoreProfiles = snapshot.docs.map(item => ({
         id: item.id,
         ...item.data()
       }));
+
+      if (firestoreProfiles.length > 0) {
+        PROFILES = firestoreProfiles;
+        usingSampleFallback = false;
+      } else {
+        // Show original profiles if Firestore is empty
+        PROFILES = [...SAMPLE_PROFILES];
+        usingSampleFallback = true;
+      }
 
       updateCounts();
       fillFilters();
@@ -339,7 +366,17 @@ function startProfileListener() {
     },
     error => {
       console.error("Firestore error:", error);
-      alert("Could not load profiles. Please check Firestore Rules and internet connection.");
+
+      // Keep sample profiles visible if Firestore read fails
+      PROFILES = [...SAMPLE_PROFILES];
+      usingSampleFallback = true;
+
+      updateCounts();
+      fillFilters();
+      render();
+
+      $("dashboardMessage").textContent =
+        "Firestore error: " + error.message;
     }
   );
 }
@@ -390,7 +427,7 @@ function openProfile(id) {
 
   $("modalContent").innerHTML = `
     <div class="modal-photo">${photo}</div>
-    <div class="modal-tag">${p.type.toUpperCase()} PROFILE</div>
+    <div class="modal-tag">${escapeHTML(p.type.toUpperCase())} PROFILE</div>
     <h2 id="modalName">${escapeHTML(p.name)}</h2>
     <p class="modal-lead">${escapeHTML(p.age)} years · ${escapeHTML(p.height)} · ${escapeHTML(p.district)}</p>
 
@@ -425,7 +462,7 @@ function closeModal() {
 // ==========================================
 
 function openAdminLogin() {
-  if (currentUser && currentUser.uid === ADMIN_UID) {
+  if (isAdmin()) {
     $("adminDashboard").classList.remove("hidden");
     renderAdminProfiles();
   } else {
@@ -436,6 +473,10 @@ function openAdminLogin() {
 function closeAdminLogin() {
   $("adminLoginModal").classList.add("hidden");
 }
+
+$("adminOpenBtn").addEventListener("click", openAdminLogin);
+
+$("adminLoginClose").addEventListener("click", closeAdminLogin);
 
 $("adminLoginForm").addEventListener("submit", async event => {
   event.preventDefault();
@@ -450,44 +491,42 @@ $("adminLoginForm").addEventListener("submit", async event => {
 
     if (result.user.uid !== ADMIN_UID) {
       await signOut(auth);
-      $("loginMessage").textContent = "This account does not have administrator permission.";
+      $("loginMessage").textContent =
+        "This account does not have administrator permission.";
       return;
     }
 
     $("adminPassword").value = "";
     $("loginMessage").textContent = "";
     closeAdminLogin();
+
     $("adminDashboard").classList.remove("hidden");
+    renderAdminProfiles();
+
   } catch (error) {
     console.error(error);
-    $("loginMessage").textContent =
-      error.code === "auth/invalid-credential"
-        ? "Incorrect email or password."
-        : error.message;
+    $("loginMessage").textContent = error.message;
   }
 });
 
 onAuthStateChanged(auth, user => {
   currentUser = user;
 
-  if (user && user.uid === ADMIN_UID) {
-    $("adminOpenBtn").textContent = "Dashboard";
+  $("adminOpenBtn").textContent = isAdmin() ? "Dashboard" : "Admin";
+
+  if (!isAdmin()) {
+    $("adminDashboard").classList.add("hidden");
   } else {
-    $("adminOpenBtn").textContent = "Admin";
-    if (!$("adminDashboard").classList.contains("hidden")) {
-      $("adminDashboard").classList.add("hidden");
-    }
+    renderAdminProfiles();
   }
 });
 
 // ==========================================
-// ADMIN PROFILE TABLE
+// ADMIN DASHBOARD
 // ==========================================
 
 function renderAdminProfiles() {
-  if (!$("adminProfileRows")) return;
-
-  if (!currentUser || currentUser.uid !== ADMIN_UID) {
+  if (!isAdmin()) {
     $("adminProfileRows").innerHTML =
       '<tr><td colspan="5">Please login as administrator.</td></tr>';
     return;
@@ -495,7 +534,7 @@ function renderAdminProfiles() {
 
   if (PROFILES.length === 0) {
     $("adminProfileRows").innerHTML =
-      '<tr><td colspan="5">No profiles yet. Add a profile or import samples.</td></tr>';
+      '<tr><td colspan="5">No profiles yet.</td></tr>';
     return;
   }
 
@@ -506,23 +545,87 @@ function renderAdminProfiles() {
       <td>${escapeHTML(p.district)}</td>
       <td>${escapeHTML(p.age)}</td>
       <td>
-        <button class="table-edit-btn" data-edit="${escapeHTML(p.id)}">Edit</button>
-        <button class="table-delete-btn" data-delete="${escapeHTML(p.id)}">Delete</button>
+        ${usingSampleFallback
+          ? '<small>Import samples first</small>'
+          : `
+            <button class="table-edit-btn" data-edit="${escapeHTML(p.id)}">Edit</button>
+            <button class="table-delete-btn" data-delete="${escapeHTML(p.id)}">Delete</button>
+          `
+        }
       </td>
     </tr>
   `).join("");
 }
 
+$("dashboardClose").addEventListener("click", () => {
+  $("adminDashboard").classList.add("hidden");
+});
+
+$("adminLogoutBtn").addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    $("adminDashboard").classList.add("hidden");
+    $("dashboardMessage").textContent = "Logged out successfully.";
+  } catch (error) {
+    $("dashboardMessage").textContent = error.message;
+  }
+});
+
 // ==========================================
-// ADMIN FORM
+// PROFILE FORM
 // ==========================================
 
+function resetProfileForm() {
+  $("profileForm").reset();
+  $("editProfileId").value = "";
+  $("profileFormTitle").textContent = "Add profile";
+  $("formMessage").textContent = "";
+}
 
+function showProfileForm(profile = null) {
+  if (!isAdmin()) return;
+
+  resetProfileForm();
+
+  if (profile) {
+    $("profileFormTitle").textContent = "Edit profile";
+    $("editProfileId").value = profile.id;
+
+    $("formType").value = profile.type || "bride";
+    $("formName").value = profile.name || "";
+    $("formAge").value = profile.age || "";
+    $("formHeight").value = profile.height || "";
+    $("formDistrict").value = profile.district || "";
+    $("formEducation").value = profile.education || "";
+    $("formProfession").value = profile.profession || "";
+    $("formMarital").value = profile.marital || "Never married";
+    $("formFamily").value = profile.family || "";
+    $("formIncome").value = profile.income || "";
+    $("formPhoto").value = profile.photo || "";
+    $("formAbout").value = profile.about || "";
+    $("formPreference").value = profile.preference || "";
+  }
+
+  $("profileForm").classList.remove("hidden");
+  $("profileForm").scrollIntoView({
+    behavior: "smooth",
+    block: "start"
+  });
+}
+
+$("addProfileBtn").addEventListener("click", () => {
+  showProfileForm();
+});
+
+$("cancelProfileBtn").addEventListener("click", () => {
+  resetProfileForm();
+  $("profileForm").classList.add("hidden");
+});
 
 $("profileForm").addEventListener("submit", async event => {
   event.preventDefault();
 
-  if (!currentUser || currentUser.uid !== ADMIN_UID) {
+  if (!isAdmin()) {
     $("formMessage").textContent = "Administrator permission required.";
     return;
   }
@@ -549,6 +652,7 @@ $("profileForm").addEventListener("submit", async event => {
   }
 
   const editId = $("editProfileId").value;
+
   $("saveProfileBtn").disabled = true;
   $("formMessage").textContent = "Saving...";
 
@@ -563,312 +667,349 @@ $("profileForm").addEventListener("submit", async event => {
 
     resetProfileForm();
     $("profileForm").classList.add("hidden");
+
   } catch (error) {
     console.error(error);
     $("formMessage").textContent = "Error: " + error.message;
+
   } finally {
     $("saveProfileBtn").disabled = false;
   }
 });
 
-// ==========================================
-// IMPORT ORIGINAL SAMPLE PROFILES
-// ==========================================
-
-$("importSamplesBtn").addEventListener("click", async () => {
-  if (!currentUser || currentUser.uid !== ADMIN_UID) return;
-
-  if (PROFILES.length > 0) {
-    $("dashboardMessage").textContent =
-      "Firestore already contains profiles. Import cancelled to avoid duplicates.";
-    return;
-  }
-
-  const confirmed = confirm(
-    "Import the 3 original sample profiles into Firestore?"
-  );
-
-  if (!confirmed) return;
-
-  $("dashboardMessage").textContent = "Importing sample profiles...";
-
-  try {
-    for (const profile of SAMPLE_PROFILES) {
-      const { id, ...data } = profile;
-      await addDoc(profilesCollection, data);
+// IMPORT ORIGINAL 3 SAMPLE PROFILES
+if (importSamplesBtn) {
+  importSamplesBtn.addEventListener("click", async () => {
+    if (!isAdmin) {
+      alert("Please login as admin first.");
+      return;
     }
 
-    $("dashboardMessage").textContent =
-      "All 3 sample profiles imported successfully.";
-  } catch (error) {
-    console.error(error);
-    $("dashboardMessage").textContent = "Import failed: " + error.message;
+    const confirmed = confirm(
+      "Import the original 3 sample profiles into Firebase?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      importSamplesBtn.disabled = true;
+      importSamplesBtn.textContent = "Importing...";
+
+      for (const profile of SAMPLE_PROFILES) {
+        await setDoc(
+          doc(db, "profiles", String(profile.id)),
+          profile
+        );
+      }
+
+      alert("Original 3 sample profiles imported successfully!");
+
+      closeAdminDashboard();
+      startProfileListener();
+
+    } catch (error) {
+      console.error("Sample import error:", error);
+      alert("Import failed: " + error.message);
+
+    } finally {
+      importSamplesBtn.disabled = false;
+      importSamplesBtn.textContent = "Import Original 3 Sample Profiles";
+    }
+  });
+}
+
+
+// SEARCH AND FILTER EVENTS
+if (searchInput) {
+  searchInput.addEventListener("input", render);
+}
+
+if (districtFilter) {
+  districtFilter.addEventListener("change", render);
+}
+
+if (educationFilter) {
+  educationFilter.addEventListener("change", render);
+}
+
+if (typeFilter) {
+  typeFilter.addEventListener("change", render);
+}
+
+
+// ADMIN BUTTON
+if (adminOpenBtn) {
+  adminOpenBtn.addEventListener("click", () => {
+    if (isAdmin) {
+      openAdminDashboard();
+    } else {
+      openAdminLogin();
+    }
+  });
+}
+
+
+// ADMIN LOGIN
+if (adminLoginForm) {
+  adminLoginForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const email = document.getElementById("adminEmail")?.value.trim();
+    const password = document.getElementById("adminPassword")?.value;
+
+    if (!email || !password) {
+      alert("Enter email and password.");
+      return;
+    }
+
+    try {
+      const result = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      if (result.user.uid !== ADMIN_UID) {
+        await signOut(auth);
+        alert("You are not authorized as admin.");
+        return;
+      }
+
+      isAdmin = true;
+      closeAdminLogin();
+      openAdminDashboard();
+
+    } catch (error) {
+      console.error("Login error:", error);
+      alert("Login failed: " + error.message);
+    }
+  });
+}
+
+
+// AUTH STATE
+onAuthStateChanged(auth, (user) => {
+  isAdmin = Boolean(user && user.uid === ADMIN_UID);
+
+  if (adminOpenBtn) {
+    adminOpenBtn.textContent = isAdmin ? "Admin Dashboard" : "Admin";
   }
 });
 
 
-/* ==========================================
-   ADMIN LOGIN AND DASHBOARD
-========================================== */
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.admin-open-btn {
-  background: var(--wine);
-  color: white;
-  border: 0;
-  padding: 12px 17px;
-  border-radius: 3px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.admin-open-btn:hover {
-  background: var(--wine-dark);
-}
-
-.admin-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  background: #24151ddd;
-  display: grid;
-  place-items: center;
-  padding: 15px;
-}
-
-.admin-box,
-.admin-dashboard-box {
-  width: min(100%, 480px);
-  max-height: 92vh;
-  overflow-y: auto;
-  background: var(--cream);
-  padding: 30px;
-  position: relative;
-  border-radius: 5px;
-}
-
-.admin-box h2,
-.admin-dashboard-box h2 {
-  font: 600 30px "Playfair Display", serif;
-  color: var(--wine);
-  margin: 12px 0;
-}
-
-.admin-box > p,
-.admin-dashboard-header p {
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--muted);
-}
-
-.admin-box form {
-  display: grid;
-  gap: 15px;
-  margin-top: 22px;
-}
-
-.admin-box label,
-.admin-profile-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  color: #827579;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.admin-box input,
-.admin-profile-form input,
-.admin-profile-form select,
-.admin-profile-form textarea {
-  width: 100%;
-  border: 1px solid var(--line);
-  background: white;
-  padding: 12px;
-  outline: none;
-  color: var(--ink);
-  font-size: 12px;
-  border-radius: 3px;
-}
-
-.admin-box input:focus,
-.admin-profile-form input:focus,
-.admin-profile-form select:focus,
-.admin-profile-form textarea:focus {
-  border-color: var(--rose);
-}
-
-.admin-box .btn {
-  width: 100%;
-}
-
-.admin-message {
-  font-size: 12px;
-  color: var(--wine);
-  line-height: 1.6;
-}
-
-.admin-dashboard-box {
-  width: min(100%, 1000px);
-}
-
-.admin-dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 18px;
-}
-
-.admin-dashboard-header .modal-close {
-  position: static;
-}
-
-.admin-dashboard-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 20px 0;
-}
-
-.admin-logout-btn {
-  border: 1px solid #e6cfd0;
-  color: var(--wine);
-  background: white;
-  padding: 13px 18px;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.admin-table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  background: white;
-  border: 1px solid var(--line);
-}
-
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
-  font-size: 11px;
-}
-
-.admin-table th,
-.admin-table td {
-  padding: 13px;
-  text-align: left;
-  border-bottom: 1px solid var(--line);
-}
-
-.admin-table th {
-  background: #f4ece8;
-  color: var(--wine);
-}
-
-.admin-table td {
-  color: #655960;
-}
-
-.table-edit-btn,
-.table-delete-btn {
-  border: 0;
-  padding: 7px 10px;
-  margin: 2px;
-  cursor: pointer;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.table-edit-btn {
-  background: #f0e4e3;
-  color: var(--wine);
-}
-
-.table-delete-btn {
-  background: #fbe9e9;
-  color: #b13e50;
-}
-
-.admin-profile-form {
-  margin-top: 25px;
-  padding: 22px;
-  background: white;
-  border: 1px solid var(--line);
-}
-
-.admin-profile-form h3 {
-  font: 600 22px "Playfair Display", serif;
-  color: var(--wine);
-  margin: 0 0 20px;
-}
-
-.admin-form-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px;
-}
-
-.admin-form-grid .wide-field {
-  grid-column: 1 / -1;
-}
-
-.admin-form-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.admin-profile-form textarea {
-  resize: vertical;
-  font-family: inherit;
-}
-
-@media(max-width:640px) {
-  .header-actions {
-    gap: 6px;
-  }
-
-  .header-cta {
-    display: none;
-  }
-
-  .admin-open-btn {
-    padding: 10px 12px;
-    font-size: 11px;
-  }
-
-  .admin-box {
-    padding: 24px 18px;
-  }
-
-  .admin-dashboard-box {
-    padding: 20px 14px;
-  }
-
-  .admin-form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-form-grid .wide-field {
-    grid-column: auto;
-  }
-
-  .admin-dashboard-actions {
-    align-items: stretch;
-  }
-
-  .admin-dashboard-actions button {
-    flex: 1;
-  }
+// CLOSE ADMIN LOGIN
+if (adminLoginModal) {
+  adminLoginModal.addEventListener("click", (event) => {
+    if (
+      event.target === adminLoginModal ||
+      event.target.classList.contains("admin-backdrop")
+    ) {
+      closeAdminLogin();
     }
+  });
+}
+
+
+// CLOSE ADMIN DASHBOARD
+if (adminDashboard) {
+  adminDashboard.addEventListener("click", (event) => {
+    if (
+      event.target === adminDashboard ||
+      event.target.classList.contains("admin-backdrop")
+    ) {
+      closeAdminDashboard();
+    }
+  });
+}
+
+
+// ADMIN LOGOUT
+if (adminLogoutBtn) {
+  adminLogoutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+      isAdmin = false;
+      closeAdminDashboard();
+      alert("Logged out successfully.");
+    } catch (error) {
+      alert("Logout failed: " + error.message);
+    }
+  });
+}
+
+
+// ADD PROFILE BUTTON
+if (addProfileBtn) {
+  addProfileBtn.addEventListener("click", () => {
+    if (!isAdmin) {
+      alert("Please login first.");
+      return;
+    }
+
+    openProfileForm();
+  });
+}
+
+
+// PROFILE FORM SUBMIT
+if (profileForm) {
+  profileForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    if (!isAdmin) {
+      alert("Admin access required.");
+      return;
+    }
+
+    try {
+      const formData = new FormData(profileForm);
+
+      const profile = {
+        id: editingProfileId || String(Date.now()),
+        type: formData.get("type") || "bride",
+        name: formData.get("name") || "",
+        age: Number(formData.get("age") || 0),
+        height: formData.get("height") || "",
+        district: formData.get("district") || "",
+        education: formData.get("education") || "",
+        profession: formData.get("profession") || "",
+        marital: formData.get("marital") || "",
+        family: formData.get("family") || "",
+        about: formData.get("about") || "",
+        preference: formData.get("preference") || "",
+        photo: formData.get("photo") || "",
+        income: formData.get("income") || ""
+      };
+
+      if (!profile.name.trim()) {
+        alert("Please enter profile name.");
+        return;
+      }
+
+      await setDoc(
+        doc(db, "profiles", profile.id),
+        profile
+      );
+
+      alert(
+        editingProfileId
+          ? "Profile updated successfully!"
+          : "New profile added successfully!"
+      );
+
+      editingProfileId = null;
+      profileForm.reset();
+      closeProfileForm();
+      startProfileListener();
+
+    } catch (error) {
+      console.error("Profile save error:", error);
+      alert("Could not save profile: " + error.message);
+    }
+  });
+}
+
+
+// PROFILE GRID CLICK EVENTS
+if (profileGrid) {
+  profileGrid.addEventListener("click", (event) => {
+    const favoriteButton = event.target.closest("[data-favorite]");
+    const viewButton = event.target.closest("[data-view]");
+
+    if (favoriteButton) {
+      const id = favoriteButton.dataset.favorite;
+      toggleFavorite(id);
+      return;
+    }
+
+    if (viewButton) {
+      const id = viewButton.dataset.view;
+      const profile = PROFILES.find(
+        item => String(item.id) === String(id)
+      );
+
+      if (profile) {
+        openProfileDetails(profile);
+      }
+    }
+  });
+}
+
+
+// ADMIN PROFILE TABLE EVENTS
+if (adminProfileRows) {
+  adminProfileRows.addEventListener("click", async (event) => {
+    const editButton = event.target.closest("[data-edit]");
+    const deleteButton = event.target.closest("[data-delete]");
+
+    if (!isAdmin) return;
+
+    if (editButton) {
+      const id = editButton.dataset.edit;
+
+      const profile = PROFILES.find(
+        item => String(item.id) === String(id)
+      );
+
+      if (profile) {
+        editingProfileId = String(profile.id);
+        fillProfileForm(profile);
+        openProfileForm();
+      }
+    }
+
+    if (deleteButton) {
+      const id = deleteButton.dataset.delete;
+
+      if (!confirm("Are you sure you want to delete this profile?")) {
+        return;
+      }
+
+      try {
+        await deleteDoc(doc(db, "profiles", String(id)));
+        alert("Profile deleted successfully!");
+        startProfileListener();
+
+      } catch (error) {
+        console.error("Delete error:", error);
+        alert("Delete failed: " + error.message);
+      }
+    }
+  });
+}
+
+
+// PROFILE DETAILS CLOSE
+if (profileModal) {
+  profileModal.addEventListener("click", (event) => {
+    if (
+      event.target === profileModal ||
+      event.target.classList.contains("modal-backdrop")
+    ) {
+      closeProfileDetails();
+    }
+  });
+}
+
+
+// CONTACT ADMINISTRATION BUTTON
+if (contactButton) {
+  contactButton.href =
+    "https://wa.me/8801928860786?text=" +
+    encodeURIComponent("Hello, I want to contact the administration.");
+}
+
+
+// MOBILE MENU
+if (menuToggle && navLinks) {
+  menuToggle.addEventListener("click", () => {
+    navLinks.classList.toggle("active");
+  });
+}
+
+
+// INITIALIZE WEBSITE
+updateCounts();
+fillFilters();
+render();
+startProfileListener();
