@@ -15,52 +15,20 @@ const SITE_SETTINGS = {
 // Photo paths should point to image files inside the project, e.g. "images/ayesha.jpg".
 const PROFILES = [
   {
-    id: 1, type: "bride", name: "Tamanna Vat", age: 24, height: "5'3\"",
-    district: "Delhi", education: "BBA", profession: "Actor",
+    id: 1, type: "bride", name: "Sohana Afrin Shefa", age: 19, height: "5'15\"",
+    district: "Chuadanga", education: "HSC", profession: "Bekar",
     marital: "Never married", family: "Educated, close-knit family",
-    about: "A warm, thoughtful person who values kindness, family and lifelong learning. Enjoys reading, travel and spending time with loved ones.",
-    preference: "Kind, respectful, emotionally mature and family-oriented. Stable career and a willingness to grow together.",
-    photo: "tamannavat.jpg", income: "Not specified"
+    about: " I am a good person, hyper active, talkative, sensitive, funny.",
+    preference: "Rich with six pack body , good looking, Understanding, supportive, technically a good person.",
+    photo: "shefa.jpg", income: "00"
   },
   {
-    id: 2, type: "bride", name: "Laila", age: 19, height: "5'4\"",
-    district: "Chuadanga", education: "Hsc", profession: "Student",
-    marital: "Never married", family: "Supportive professional Rich family",
-    about: "Curious, compassionate and career-minded. Believes a good relationship is built on mutual respect and honest communication.",
-    preference: "Educated, responsible and supportive of each other's ambitions.",
-    photo: "morium.jpg", income: "Not specified"
-  },
-  {
-    id: 3, type: "bride", name: "Maliha Islam", age: 23, height: "5'2\"",
-    district: "Sylhet", education: "Honours", profession: "Entrepreneur",
-    marital: "Never married", family: "Small, supportive family",
-    about: "Creative and independent. Loves design, cooking and exploring new ideas.",
-    preference: "A sincere, patient partner with a positive outlook and respect for family.",
-    photo: "", income: "Not specified"
-  },
-  {
-    id: 4, type: "groom", name: "Arif Hasan", age: 28, height: "5'9\"",
-    district: "Dhaka", education: "MBA", profession: "Software Engineer",
+    id: 4, type: "groom", name: "Md.Kowsar", age: 19, height: "5'7\"",
+    district: "Chuadanga", education: "HSC", profession: "ARMY🪖",
     marital: "Never married", family: "Respectful, middle-class family",
     about: "Practical, calm and curious. Enjoys technology, fitness and meaningful conversations.",
     preference: "Kind, honest and communicative. Values mutual respect and shared decision-making.",
-    photo: "", income: "৳80,000–100,000"
-  },
-  {
-    id: 5, type: "groom", name: "Sakib Ahmed", age: 30, height: "5'10\"",
-    district: "Rajshahi", education: "MBBS", profession: "Physician",
-    marital: "Never married", family: "Educated family",
-    about: "Compassionate and family-oriented. Enjoys travelling and volunteering when time allows.",
-    preference: "Understanding, respectful and supportive of a balanced family and professional life.",
-    photo: "", income: "৳100,000–150,000"
-  },
-  {
-    id: 6, type: "groom", name: "Fahim Chowdhury", age: 27, height: "5'8\"",
-    district: "Sylhet", education: "BSc", profession: "Business Owner",
-    marital: "Never married", family: "Established family business",
-    about: "Ambitious but grounded. Values honesty, personal growth and time with family.",
-    preference: "Friendly, thoughtful and open-minded. Wants to build a partnership based on trust.",
-    photo: "", income: "৳70,000–90,000"
+    photo: "kowsar.jpg", income: "0"
   }
 ];
 
