@@ -23,13 +23,22 @@ const PROFILES = [
     photo: "Assets/shefa.jpg", income: "00"
   },
   {
-    id: 4, type: "groom", name: "Md.Kowsar", age: 19, height: "5'7\"",
+    id: 2, type: "groom", name: "Md.Kowsar", age: 19, height: "5'7\"",
     district: "Chuadanga", education: "HSC", profession: "ARMY🪖",
     marital: "Never married", family: "Respectful, middle-class family",
     about: "Practical, calm and curious. Enjoys technology, fitness and meaningful conversations.",
     preference: "Kind, honest and communicative. Values mutual respect and shared decision-making.",
     photo: "kowsar.jpg", income: "0"
+  },
+  {
+  id: 3, type: "groom", name: "Abir Saha", age: 19, height: "5'11\"",
+  district: "Chandpur", education: "HSC PASS", profession: "STUDENT",
+  marital: "Unmarried / Single", family: "Middle-class family",
+  about: "An autophile and nyctophile who loves automobiles and the beauty of the night.",
+  preference: "Beautiful girl",
+  photo: "Assets/abir.jpg", income: "Bape joto dey"
   }
+  
 ];
 
 const $ = id => document.getElementById(id);
