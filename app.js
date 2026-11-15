@@ -910,7 +910,29 @@ profileGrid.addEventListener("click", async event => {
   const editButton = event.target.closest("[data-card-edit]");
 
   if (editButton) {
-    if (!isAdmin()) return;
+  alert("Edit button clicked!");
+
+  if (!isAdmin()) {
+    alert("Admin login required!");
+    return;
+  }
+
+  alert("Admin verified!");
+
+  const id = editButton.dataset.cardEdit;
+
+  const profile = PROFILES.find(
+    p => String(p.id) === String(id)
+  );
+
+  if (!profile) {
+    alert("Profile not found!");
+    return;
+  }
+
+  openProfileForm(profile);
+  return;
+  }
 
     const profile = PROFILES.find(
       p => String(p.id) === String(editButton.dataset.cardEdit)
