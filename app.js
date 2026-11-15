@@ -28,7 +28,7 @@ const PROFILES = [
     marital: "Never married", family: "Respectful, middle-class family",
     about: "Practical, calm and curious. Enjoys technology, fitness and meaningful conversations.",
     preference: "Kind, honest and communicative. Values mutual respect and shared decision-making.",
-    photo: "kowsar.jpg", income: "0"
+    photo: "Assets/kowsar.jpg", income: "0"
   },
   {
   id: 3, type: "groom", name: "Abir Saha", age: 19, height: "5'11\"",
