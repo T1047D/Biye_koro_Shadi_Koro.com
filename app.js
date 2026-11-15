@@ -517,40 +517,7 @@ function renderAdminProfiles() {
 // ADMIN FORM
 // ==========================================
 
-function resetProfileForm() {
-  $("profileForm").reset();
-  $("editProfileId").value = "";
-  $("profileFormTitle").textContent = "Add profile";
-  $("formMessage").textContent = "";
-}
 
-function showProfileForm(profile = null) {
-  if (!currentUser || currentUser.uid !== ADMIN_UID) return;
-
-  resetProfileForm();
-
-  if (profile) {
-    $("profileFormTitle").textContent = "Edit profile";
-    $("editProfileId").value = profile.id;
-
-    $("formType").value = profile.type || "bride";
-    $("formName").value = profile.name || "";
-    $("formAge").value = profile.age || "";
-    $("formHeight").value = profile.height || "";
-    $("formDistrict").value = profile.district || "";
-    $("formEducation").value = profile.education || "";
-    $("formProfession").value = profile.profession || "";
-    $("formMarital").value = profile.marital || "Never married";
-    $("formFamily").value = profile.family || "";
-    $("formIncome").value = profile.income || "";
-    $("formPhoto").value = profile.photo || "";
-    $("formAbout").value = profile.about || "";
-    $("formPreference").value = profile.preference || "";
-  }
-
-  $("profileForm").classList.remove("hidden");
-  $("profileForm").scrollIntoView({ behavior: "smooth", block: "start" });
-}
 
 $("profileForm").addEventListener("submit", async event => {
   event.preventDefault();
@@ -639,31 +606,269 @@ $("importSamplesBtn").addEventListener("click", async () => {
   }
 });
 
-// ==========================================
-// ADMIN TABLE ACTIONS
-// ==========================================
 
-$("adminProfileRows").addEventListener("click", async event => {
-  if (!currentUser || currentUser.uid !== ADMIN_UID) return;
+/* ==========================================
+   ADMIN LOGIN AND DASHBOARD
+========================================== */
 
-  const editButton = event.target.closest("[data-edit]");
-  const deleteButton = event.target.closest("[data-delete]");
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-  if (editButton) {
-    const profile = PROFILES.find(p =>
-      String(p.id) === String(editButton.dataset.edit)
-    );
+.admin-open-btn {
+  background: var(--wine);
+  color: white;
+  border: 0;
+  padding: 12px 17px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
 
-    if (profile) showProfileForm(profile);
+.admin-open-btn:hover {
+  background: var(--wine-dark);
+}
+
+.admin-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #24151ddd;
+  display: grid;
+  place-items: center;
+  padding: 15px;
+}
+
+.admin-box,
+.admin-dashboard-box {
+  width: min(100%, 480px);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--cream);
+  padding: 30px;
+  position: relative;
+  border-radius: 5px;
+}
+
+.admin-box h2,
+.admin-dashboard-box h2 {
+  font: 600 30px "Playfair Display", serif;
+  color: var(--wine);
+  margin: 12px 0;
+}
+
+.admin-box > p,
+.admin-dashboard-header p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+
+.admin-box form {
+  display: grid;
+  gap: 15px;
+  margin-top: 22px;
+}
+
+.admin-box label,
+.admin-profile-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #827579;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.admin-box input,
+.admin-profile-form input,
+.admin-profile-form select,
+.admin-profile-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: white;
+  padding: 12px;
+  outline: none;
+  color: var(--ink);
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.admin-box input:focus,
+.admin-profile-form input:focus,
+.admin-profile-form select:focus,
+.admin-profile-form textarea:focus {
+  border-color: var(--rose);
+}
+
+.admin-box .btn {
+  width: 100%;
+}
+
+.admin-message {
+  font-size: 12px;
+  color: var(--wine);
+  line-height: 1.6;
+}
+
+.admin-dashboard-box {
+  width: min(100%, 1000px);
+}
+
+.admin-dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 18px;
+}
+
+.admin-dashboard-header .modal-close {
+  position: static;
+}
+
+.admin-dashboard-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 20px 0;
+}
+
+.admin-logout-btn {
+  border: 1px solid #e6cfd0;
+  color: var(--wine);
+  background: white;
+  padding: 13px 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.admin-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  background: white;
+  border: 1px solid var(--line);
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 600px;
+  font-size: 11px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 13px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-table th {
+  background: #f4ece8;
+  color: var(--wine);
+}
+
+.admin-table td {
+  color: #655960;
+}
+
+.table-edit-btn,
+.table-delete-btn {
+  border: 0;
+  padding: 7px 10px;
+  margin: 2px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.table-edit-btn {
+  background: #f0e4e3;
+  color: var(--wine);
+}
+
+.table-delete-btn {
+  background: #fbe9e9;
+  color: #b13e50;
+}
+
+.admin-profile-form {
+  margin-top: 25px;
+  padding: 22px;
+  background: white;
+  border: 1px solid var(--line);
+}
+
+.admin-profile-form h3 {
+  font: 600 22px "Playfair Display", serif;
+  color: var(--wine);
+  margin: 0 0 20px;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.admin-form-grid .wide-field {
+  grid-column: 1 / -1;
+}
+
+.admin-form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.admin-profile-form textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+@media(max-width:640px) {
+  .header-actions {
+    gap: 6px;
   }
 
-  if (deleteButton) {
-    const id = deleteButton.dataset.delete;
+  .header-cta {
+    display: none;
+  }
 
-    if (!confirm("Are you sure you want to delete this profile?")) return;
+  .admin-open-btn {
+    padding: 10px 12px;
+    font-size: 11px;
+  }
 
-    try {
-      await deleteDoc(doc(db, "profiles", id));
-      $("dashboardMessage").textContent = "Profile deleted successfully.";
-    } catch (error) {
-      console.error
+  .admin-box {
+    padding: 24px 18px;
+  }
+
+  .admin-dashboard-box {
+    padding: 20px 14px;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-grid .wide-field {
+    grid-column: auto;
+  }
+
+  .admin-dashboard-actions {
+    align-items: stretch;
+  }
+
+  .admin-dashboard-actions button {
+    flex: 1;
+  }
+    }
