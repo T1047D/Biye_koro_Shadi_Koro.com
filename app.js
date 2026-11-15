@@ -11,9 +11,7 @@ import {
 import {
   getFirestore,
   collection,
-  addDoc,
   setDoc,
-  updateDoc,
   deleteDoc,
   doc,
   onSnapshot
@@ -46,12 +44,11 @@ const profilesCollection = collection(db, "profiles");
 const SITE_SETTINGS = {
   showBrides: true,
   showGrooms: true,
-  administratorWhatsApp: "+8801928860786",
-  administratorEmail: "kh4892001@gmail.com"
+  administratorWhatsApp: "+8801928860786"
 };
 
 // ==========================================
-// ORIGINAL 3 PROFILES
+// ORIGINAL 3 SAMPLE PROFILES
 // ==========================================
 
 const SAMPLE_PROFILES = [
@@ -106,7 +103,7 @@ const SAMPLE_PROFILES = [
 ];
 
 // ==========================================
-// 64 DISTRICTS OF BANGLADESH
+// 64 DISTRICTS
 // ==========================================
 
 const ALL_DISTRICTS = [
@@ -138,26 +135,32 @@ const ALL_EDUCATION = [
 ];
 
 // ==========================================
-// HELPERS AND STATE
+// HTML ELEMENTS AND STATE
 // ==========================================
 
 const $ = id => document.getElementById(id);
 
-const escapeHTML = value =>
-  String(value ?? "").replace(/[&<>"']/g, ch => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[ch]));
+const profileGrid = $("profileGrid");
+const profileModal = $("profileModal");
+const modalContent = $("modalContent");
+const modalClose = $("modalClose");
+
+const adminLoginModal = $("adminLoginModal");
+const adminLoginForm = $("adminLoginForm");
+const adminDashboard = $("adminDashboard");
+const adminProfileRows = $("adminProfileRows");
+const profileForm = $("profileForm");
+
+const adminOpenBtn = $("adminOpenBtn");
+const menuToggle = $("menuToggle");
+const mainNav = document.querySelector(".main-nav");
 
 let PROFILES = [...SAMPLE_PROFILES];
-let firestoreProfiles = [];
-let usingSampleFallback = true;
 let currentType = "bride";
 let currentUser = null;
 let unsubscribeProfiles = null;
+let usingSampleFallback = true;
+let editingProfileId = null;
 
 let favorites = new Set();
 
@@ -170,18 +173,17 @@ try {
 }
 
 function isAdmin() {
-  return currentUser && currentUser.uid === ADMIN_UID;
+  return Boolean(currentUser && currentUser.uid === ADMIN_UID);
 }
 
-// ==========================================
-// PROFILE VISIBILITY
-// ==========================================
-
-function visibleProfiles() {
-  return PROFILES.filter(p =>
-    (p.type === "bride" && SITE_SETTINGS.showBrides) ||
-    (p.type === "groom" && SITE_SETTINGS.showGrooms)
-  );
+function escapeHTML(value) {
+  return String(value ?? "").replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  }[char]));
 }
 
 // ==========================================
@@ -200,9 +202,11 @@ function updateCounts() {
 
   const phone = SITE_SETTINGS.administratorWhatsApp.replace(/\D/g, "");
 
-  $("contactButton").href = `https://wa.me/${phone}`;
+  $("contactButton").href =
+    `https://wa.me/${phone}?text=${encodeURIComponent("Hello, I want to contact the administration.")}`;
+
   $("contactButton").target = "_blank";
-  $("contactButton").rel = "noopener";
+  $("contactButton").rel = "noopener noreferrer";
 
   document.querySelector('[data-type="bride"]')
     .classList.toggle("hidden", !SITE_SETTINGS.showBrides);
@@ -216,42 +220,41 @@ function updateCounts() {
 // ==========================================
 
 function fillFilters() {
-  const source = currentType === "favorites"
-    ? visibleProfiles().filter(p => favorites.has(String(p.id)))
-    : visibleProfiles().filter(p => p.type === currentType);
+  const oldDistrict = $("districtFilter").value;
+  const oldEducation = $("educationFilter").value;
 
   const districts = [...new Set([
     ...ALL_DISTRICTS,
-    ...source.map(p => p.district).filter(Boolean)
+    ...PROFILES.map(p => p.district).filter(Boolean)
   ])].sort();
 
   const education = [...new Set([
     ...ALL_EDUCATION,
-    ...source.map(p => p.education).filter(Boolean)
+    ...PROFILES.map(p => p.education).filter(Boolean)
   ])].sort();
 
   $("districtFilter").innerHTML =
     '<option value="">All districts</option>' +
-    districts.map(v =>
-      `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`
+    districts.map(value =>
+      `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`
     ).join("");
 
   $("educationFilter").innerHTML =
     '<option value="">All education</option>' +
-    education.map(v =>
-      `<option value="${escapeHTML(v)}">${escapeHTML(v)}</option>`
+    education.map(value =>
+      `<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`
     ).join("");
 
-  // District list inside admin profile form
-  if ($("districtOptions")) {
-    $("districtOptions").innerHTML = ALL_DISTRICTS.map(v =>
-      `<option value="${escapeHTML(v)}"></option>`
-    ).join("");
-  }
+  $("districtFilter").value = oldDistrict;
+  $("educationFilter").value = oldEducation;
+
+  $("districtOptions").innerHTML = ALL_DISTRICTS.map(value =>
+    `<option value="${escapeHTML(value)}"></option>`
+  ).join("");
 }
 
 // ==========================================
-// RENDER PROFILES
+// PROFILE RENDERING
 // ==========================================
 
 function render() {
@@ -261,7 +264,10 @@ function render() {
   const ageRange = $("ageFilter").value;
   const marital = $("maritalFilter").value;
 
-  let list = visibleProfiles();
+  let list = PROFILES.filter(p =>
+    (p.type === "bride" && SITE_SETTINGS.showBrides) ||
+    (p.type === "groom" && SITE_SETTINGS.showGrooms)
+  );
 
   if (currentType === "favorites") {
     list = list.filter(p => favorites.has(String(p.id)));
@@ -270,19 +276,21 @@ function render() {
   }
 
   list = list.filter(p => {
-    const haystack = [
-      p.name, p.district, p.profession, p.education
+    const searchable = [
+      p.name, p.district, p.profession,
+      p.education, p.about
     ].join(" ").toLowerCase();
 
     let ageMatches = true;
 
     if (ageRange) {
       const [min, max] = ageRange.split("-").map(Number);
-      ageMatches = Number(p.age) >= min && Number(p.age) <= max;
+      ageMatches =
+        Number(p.age) >= min && Number(p.age) <= max;
     }
 
     return (
-      (!query || haystack.includes(query)) &&
+      (!query || searchable.includes(query)) &&
       (!district || p.district === district) &&
       (!education || p.education === education) &&
       ageMatches &&
@@ -293,23 +301,26 @@ function render() {
   $("resultCount").textContent =
     `${list.length} ${list.length === 1 ? "profile" : "profiles"}`;
 
-  $("profileGrid").innerHTML = list.map(p => `
+  profileGrid.innerHTML = list.map(p => `
     <article class="profile-card">
       <div class="profile-visual ${escapeHTML(p.type)}">
-        <button class="fav-btn ${favorites.has(String(p.id)) ? "saved" : ""}"
+        <button
+          class="fav-btn ${favorites.has(String(p.id)) ? "saved" : ""}"
           data-fav="${escapeHTML(p.id)}"
-          aria-label="Save ${escapeHTML(p.name)}">
+          aria-label="Save profile">
           ${favorites.has(String(p.id)) ? "♥" : "♡"}
         </button>
 
-        ${p.photo
-          ? `<img src="${escapeHTML(p.photo)}" alt="${escapeHTML(p.name)}" loading="lazy">`
-          : `<div class="avatar">${p.type === "bride" ? "👩🏻" : "👨🏻"}</div>`
+        ${
+          p.photo
+            ? `<img src="${escapeHTML(p.photo)}" alt="${escapeHTML(p.name)}" loading="lazy">`
+            : `<div class="avatar">${p.type === "bride" ? "👩🏻" : "👨🏻"}</div>`
         }
       </div>
 
       <div class="profile-info">
         <h3>${escapeHTML(p.name)}</h3>
+
         <div class="profile-sub">
           ${escapeHTML(p.profession)} · ${escapeHTML(p.district)}
         </div>
@@ -330,9 +341,32 @@ function render() {
     </article>
   `).join("");
 
-  $("emptyState").classList.toggle("hidden", list.length !== 0);
-  $("profileGrid").classList.toggle("hidden", list.length === 0);
+  $("emptyState").classList.toggle("hidden", list.length > 0);
+  profileGrid.classList.toggle("hidden", list.length === 0);
+
   $("favoriteCount").textContent = favorites.size;
+}
+
+// ==========================================
+// FAVORITES
+// ==========================================
+
+function toggleFavorite(id) {
+  id = String(id);
+
+  if (favorites.has(id)) {
+    favorites.delete(id);
+  } else {
+    favorites.add(id);
+  }
+
+  localStorage.setItem(
+    "bks_static_favorites",
+    JSON.stringify([...favorites])
+  );
+
+  updateCounts();
+  render();
 }
 
 // ==========================================
@@ -340,21 +374,22 @@ function render() {
 // ==========================================
 
 function startProfileListener() {
-  if (unsubscribeProfiles) unsubscribeProfiles();
+  if (unsubscribeProfiles) {
+    unsubscribeProfiles();
+  }
 
   unsubscribeProfiles = onSnapshot(
     profilesCollection,
     snapshot => {
-      firestoreProfiles = snapshot.docs.map(item => ({
-        id: item.id,
-        ...item.data()
+      const databaseProfiles = snapshot.docs.map(item => ({
+        ...item.data(),
+        id: item.id
       }));
 
-      if (firestoreProfiles.length > 0) {
-        PROFILES = firestoreProfiles;
+      if (databaseProfiles.length > 0) {
+        PROFILES = databaseProfiles;
         usingSampleFallback = false;
       } else {
-        // Show original profiles if Firestore is empty
         PROFILES = [...SAMPLE_PROFILES];
         usingSampleFallback = true;
       }
@@ -367,7 +402,6 @@ function startProfileListener() {
     error => {
       console.error("Firestore error:", error);
 
-      // Keep sample profiles visible if Firestore read fails
       PROFILES = [...SAMPLE_PROFILES];
       usingSampleFallback = true;
 
@@ -376,7 +410,7 @@ function startProfileListener() {
       render();
 
       $("dashboardMessage").textContent =
-        "Firestore error: " + error.message;
+        "Database error: " + error.message;
     }
   );
 }
@@ -386,74 +420,120 @@ function startProfileListener() {
 // ==========================================
 
 function clearFilters() {
-  [
-    "searchInput",
-    "districtFilter",
-    "educationFilter",
-    "ageFilter",
-    "maritalFilter"
-  ].forEach(id => $(id).value = "");
+  $("searchInput").value = "";
+  $("districtFilter").value = "";
+  $("educationFilter").value = "";
+  $("ageFilter").value = "";
+  $("maritalFilter").value = "";
 
-  fillFilters();
   render();
 }
 
 function selectType(type) {
   currentType = type;
 
-  document.querySelectorAll(".type-tab").forEach(button =>
-    button.classList.toggle("active", button.dataset.type === type)
-  );
+  document.querySelectorAll(".type-tab").forEach(button => {
+    button.classList.toggle(
+      "active",
+      button.dataset.type === type
+    );
+  });
 
   clearFilters();
 }
 
 // ==========================================
-// PROFILE DETAILS
+// PROFILE DETAILS MODAL
 // ==========================================
 
 function openProfile(id) {
-  const p = PROFILES.find(profile => String(profile.id) === String(id));
+  const p = PROFILES.find(
+    profile => String(profile.id) === String(id)
+  );
+
   if (!p) return;
+
+  const phone = SITE_SETTINGS.administratorWhatsApp.replace(/\D/g, "");
+
+  const contactLink =
+    `https://wa.me/${phone}?text=${encodeURIComponent(
+      `Hello, I am interested in profile ${p.name} (ID: ${p.id}).`
+    )}`;
 
   const photo = p.photo
     ? `<img src="${escapeHTML(p.photo)}" alt="${escapeHTML(p.name)}">`
-    : (p.type === "bride" ? "👩🏻" : "👨🏻");
+    : `<div class="avatar">${p.type === "bride" ? "👩🏻" : "👨🏻"}</div>`;
 
-  const contactLink =
-    `https://wa.me/${SITE_SETTINGS.administratorWhatsApp.replace(/\D/g, "")}?text=${
-      encodeURIComponent(`Hello, I am interested in profile ${p.name} (ID: ${p.id}).`)
-    }`;
-
-  $("modalContent").innerHTML = `
+  modalContent.innerHTML = `
     <div class="modal-photo">${photo}</div>
-    <div class="modal-tag">${escapeHTML(p.type.toUpperCase())} PROFILE</div>
-    <h2 id="modalName">${escapeHTML(p.name)}</h2>
-    <p class="modal-lead">${escapeHTML(p.age)} years · ${escapeHTML(p.height)} · ${escapeHTML(p.district)}</p>
 
-    <div class="detail-grid">
-      <div class="detail-item"><span>Education</span><strong>${escapeHTML(p.education)}</strong></div>
-      <div class="detail-item"><span>Profession</span><strong>${escapeHTML(p.profession)}</strong></div>
-      <div class="detail-item"><span>Marital status</span><strong>${escapeHTML(p.marital)}</strong></div>
-      <div class="detail-item"><span>Family background</span><strong>${escapeHTML(p.family)}</strong></div>
-      <div class="detail-item"><span>Income</span><strong>${escapeHTML(p.income || "Not specified")}</strong></div>
-      <div class="detail-item"><span>Profile type</span><strong>${p.type === "bride" ? "Bride" : "Groom"}</strong></div>
+    <div class="modal-tag">
+      ${escapeHTML(p.type.toUpperCase())} PROFILE
     </div>
 
-    <div class="modal-section"><h3>About</h3><p>${escapeHTML(p.about)}</p></div>
-    <div class="modal-section"><h3>Expected partner</h3><p>${escapeHTML(p.preference)}</p></div>
+    <h2 id="modalName">${escapeHTML(p.name)}</h2>
+
+    <p class="modal-lead">
+      ${escapeHTML(p.age)} years ·
+      ${escapeHTML(p.height)} ·
+      ${escapeHTML(p.district)}
+    </p>
+
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span>Education</span>
+        <strong>${escapeHTML(p.education)}</strong>
+      </div>
+
+      <div class="detail-item">
+        <span>Profession</span>
+        <strong>${escapeHTML(p.profession)}</strong>
+      </div>
+
+      <div class="detail-item">
+        <span>Marital status</span>
+        <strong>${escapeHTML(p.marital)}</strong>
+      </div>
+
+      <div class="detail-item">
+        <span>Family background</span>
+        <strong>${escapeHTML(p.family)}</strong>
+      </div>
+
+      <div class="detail-item">
+        <span>Income</span>
+        <strong>${escapeHTML(p.income || "Not specified")}</strong>
+      </div>
+
+      <div class="detail-item">
+        <span>Profile type</span>
+        <strong>${p.type === "bride" ? "Bride" : "Groom"}</strong>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>About</h3>
+      <p>${escapeHTML(p.about || "Not specified")}</p>
+    </div>
+
+    <div class="modal-section">
+      <h3>Expected partner</h3>
+      <p>${escapeHTML(p.preference || "Not specified")}</p>
+    </div>
 
     <div class="modal-contact">
-      <a href="${contactLink}" target="_blank" rel="noopener">Contact administrator ↗</a>
+      <a href="${contactLink}" target="_blank" rel="noopener noreferrer">
+        Contact administrator ↗
+      </a>
     </div>
   `;
 
-  $("profileModal").classList.remove("hidden");
+  profileModal.classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
 
 function closeModal() {
-  $("profileModal").classList.add("hidden");
+  profileModal.classList.add("hidden");
   document.body.style.overflow = "";
 }
 
@@ -463,18 +543,32 @@ function closeModal() {
 
 function openAdminLogin() {
   if (isAdmin()) {
-    $("adminDashboard").classList.remove("hidden");
-    renderAdminProfiles();
+    openAdminDashboard();
   } else {
-    $("adminLoginModal").classList.remove("hidden");
+    adminLoginModal.classList.remove("hidden");
   }
 }
 
 function closeAdminLogin() {
-  $("adminLoginModal").classList.add("hidden");
+  adminLoginModal.classList.add("hidden");
 }
 
-$("adminOpenBtn").addEventListener("click", openAdminLogin);
+function openAdminDashboard() {
+  if (!isAdmin()) {
+    openAdminLogin();
+    return;
+  }
+
+  adminDashboard.classList.remove("hidden");
+  renderAdminProfiles();
+}
+
+function closeAdminDashboard() {
+  adminDashboard.classList.add("hidden");
+  profileForm.classList.add("hidden");
+}
+
+adminOpenBtn.addEventListener("click", openAdminLogin);
 
 $("adminLoginClose").addEventListener("click", closeAdminLogin);
 
@@ -487,24 +581,29 @@ $("adminLoginForm").addEventListener("submit", async event => {
   $("loginMessage").textContent = "Signing in...";
 
   try {
-    const result = await signInWithEmailAndPassword(auth, email, password);
+    const result = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
 
     if (result.user.uid !== ADMIN_UID) {
       await signOut(auth);
+
       $("loginMessage").textContent =
         "This account does not have administrator permission.";
+
       return;
     }
 
     $("adminPassword").value = "";
     $("loginMessage").textContent = "";
-    closeAdminLogin();
 
-    $("adminDashboard").classList.remove("hidden");
-    renderAdminProfiles();
+    closeAdminLogin();
+    openAdminDashboard();
 
   } catch (error) {
-    console.error(error);
+    console.error("Login error:", error);
     $("loginMessage").textContent = error.message;
   }
 });
@@ -512,59 +611,71 @@ $("adminLoginForm").addEventListener("submit", async event => {
 onAuthStateChanged(auth, user => {
   currentUser = user;
 
-  $("adminOpenBtn").textContent = isAdmin() ? "Dashboard" : "Admin";
+  adminOpenBtn.textContent =
+    isAdmin() ? "Dashboard" : "Admin";
 
   if (!isAdmin()) {
-    $("adminDashboard").classList.add("hidden");
+    closeAdminDashboard();
   } else {
     renderAdminProfiles();
   }
 });
 
 // ==========================================
-// ADMIN DASHBOARD
+// ADMIN PROFILE TABLE
 // ==========================================
 
 function renderAdminProfiles() {
   if (!isAdmin()) {
-    $("adminProfileRows").innerHTML =
+    adminProfileRows.innerHTML =
       '<tr><td colspan="5">Please login as administrator.</td></tr>';
     return;
   }
 
   if (PROFILES.length === 0) {
-    $("adminProfileRows").innerHTML =
+    adminProfileRows.innerHTML =
       '<tr><td colspan="5">No profiles yet.</td></tr>';
     return;
   }
 
-  $("adminProfileRows").innerHTML = PROFILES.map(p => `
+  adminProfileRows.innerHTML = PROFILES.map(p => `
     <tr>
       <td>${escapeHTML(p.name)}</td>
       <td>${escapeHTML(p.type)}</td>
       <td>${escapeHTML(p.district)}</td>
       <td>${escapeHTML(p.age)}</td>
       <td>
-        ${usingSampleFallback
-          ? '<small>Import samples first</small>'
-          : `
-            <button class="table-edit-btn" data-edit="${escapeHTML(p.id)}">Edit</button>
-            <button class="table-delete-btn" data-delete="${escapeHTML(p.id)}">Delete</button>
-          `
+        ${
+          usingSampleFallback
+            ? '<small>Import samples first</small>'
+            : `
+              <button class="table-edit-btn" data-edit="${escapeHTML(p.id)}">Edit</button>
+              <button class="table-delete-btn" data-delete="${escapeHTML(p.id)}">Delete</button>
+            `
         }
       </td>
     </tr>
   `).join("");
 }
 
-$("dashboardClose").addEventListener("click", () => {
-  $("adminDashboard").classList.add("hidden");
+$("dashboardClose").addEventListener("click", closeAdminDashboard);
+
+adminDashboard.addEventListener("click", event => {
+  if (event.target === adminDashboard) {
+    closeAdminDashboard();
+  }
+});
+
+adminLoginModal.addEventListener("click", event => {
+  if (event.target === adminLoginModal) {
+    closeAdminLogin();
+  }
 });
 
 $("adminLogoutBtn").addEventListener("click", async () => {
   try {
     await signOut(auth);
-    $("adminDashboard").classList.add("hidden");
+    closeAdminDashboard();
     $("dashboardMessage").textContent = "Logged out successfully.";
   } catch (error) {
     $("dashboardMessage").textContent = error.message;
@@ -572,25 +683,62 @@ $("adminLogoutBtn").addEventListener("click", async () => {
 });
 
 // ==========================================
-// PROFILE FORM
+// IMPORT ORIGINAL 3 SAMPLE PROFILES
 // ==========================================
 
-function resetProfileForm() {
-  $("profileForm").reset();
-  $("editProfileId").value = "";
-  $("profileFormTitle").textContent = "Add profile";
-  $("formMessage").textContent = "";
-}
+$("importSamplesBtn").addEventListener("click", async () => {
+  if (!isAdmin()) {
+    alert("Please login as administrator.");
+    return;
+  }
 
-function showProfileForm(profile = null) {
-  if (!isAdmin()) return;
+  if (!confirm("Import the original 3 sample profiles?")) {
+    return;
+  }
 
-  resetProfileForm();
+  const button = $("importSamplesBtn");
+  button.disabled = true;
+  button.textContent = "Importing...";
+
+  try {
+    for (const profile of SAMPLE_PROFILES) {
+      await setDoc(
+        doc(db, "profiles", String(profile.id)),
+        profile
+      );
+    }
+
+    $("dashboardMessage").textContent =
+      "Original 3 sample profiles imported successfully!";
+
+    alert("3 sample profiles imported successfully!");
+
+  } catch (error) {
+    console.error("Import error:", error);
+    alert("Import failed: " + error.message);
+
+  } finally {
+    button.disabled = false;
+    button.textContent = "Import sample profiles";
+  }
+});
+
+// ==========================================
+// ADD / EDIT PROFILE FORM
+// ==========================================
+
+function openProfileForm(profile = null) {
+  if (!isAdmin()) {
+    alert("Admin access required.");
+    return;
+  }
+
+  profileForm.reset();
 
   if (profile) {
-    $("profileFormTitle").textContent = "Edit profile";
-    $("editProfileId").value = profile.id;
+    editingProfileId = String(profile.id);
 
+    $("profileFormTitle").textContent = "Edit profile";
     $("formType").value = profile.type || "bride";
     $("formName").value = profile.name || "";
     $("formAge").value = profile.age || "";
@@ -604,33 +752,48 @@ function showProfileForm(profile = null) {
     $("formPhoto").value = profile.photo || "";
     $("formAbout").value = profile.about || "";
     $("formPreference").value = profile.preference || "";
-  }
 
-  $("profileForm").classList.remove("hidden");
-  $("profileForm").scrollIntoView({
+  } else {
+    editingProfileId = null;
+    $("profileFormTitle").textContent = "Add profile";
+    $("formType").value = "bride";
+  }
+  profileForm.classList.remove("hidden");
+  $("formMessage").textContent = "";
+
+  profileForm.scrollIntoView({
     behavior: "smooth",
     block: "start"
   });
 }
 
+function closeProfileForm() {
+  profileForm.classList.add("hidden");
+  profileForm.reset();
+  editingProfileId = null;
+}
+
 $("addProfileBtn").addEventListener("click", () => {
-  showProfileForm();
+  openProfileForm();
 });
 
-$("cancelProfileBtn").addEventListener("click", () => {
-  resetProfileForm();
-  $("profileForm").classList.add("hidden");
-});
+$("cancelProfileBtn").addEventListener("click", closeProfileForm);
 
-$("profileForm").addEventListener("submit", async event => {
+profileForm.addEventListener("submit", async event => {
   event.preventDefault();
 
   if (!isAdmin()) {
-    $("formMessage").textContent = "Administrator permission required.";
+    alert("Admin access required.");
     return;
   }
+  const saveButton = $("saveProfileBtn");
+  saveButton.disabled = true;
+  saveButton.textContent = "Saving...";
+
+  const profileId = editingProfileId || String(Date.now());
 
   const profile = {
+    id: profileId,
     type: $("formType").value,
     name: $("formName").value.trim(),
     age: Number($("formAge").value),
@@ -646,390 +809,163 @@ $("profileForm").addEventListener("submit", async event => {
     preference: $("formPreference").value.trim()
   };
 
-  if (profile.age < 18) {
-    $("formMessage").textContent = "Profile age must be at least 18.";
-    return;
-  }
-
-  const editId = $("editProfileId").value;
-
-  $("saveProfileBtn").disabled = true;
-  $("formMessage").textContent = "Saving...";
-
   try {
-    if (editId) {
-      await updateDoc(doc(db, "profiles", editId), profile);
-      $("formMessage").textContent = "Profile updated successfully.";
-    } else {
-      await addDoc(profilesCollection, profile);
-      $("formMessage").textContent = "Profile added successfully.";
+    if (!profile.name || !profile.district || !profile.education) {
+      throw new Error("Please fill in Name, District and Education.");
     }
 
-    resetProfileForm();
-    $("profileForm").classList.add("hidden");
+    await setDoc(
+      doc(db, "profiles", profileId),
+      profile
+    );
+       $("formMessage").textContent =
+      editingProfileId
+        ? "Profile updated successfully!"
+        : "Profile added successfully!";
+
+    closeProfileForm();
+
+    $("dashboardMessage").textContent =
+      "Profile saved successfully.";
 
   } catch (error) {
-    console.error(error);
-    $("formMessage").textContent = "Error: " + error.message;
+    console.error("Profile save error:", error);
+    $("formMessage").textContent = error.message;
 
   } finally {
-    $("saveProfileBtn").disabled = false;
+    saveButton.disabled = false;
+    saveButton.textContent = "Save profile";
   }
 });
 
-function closeAdminDashboard() {
-  if (adminDashboard) {
-    adminDashboard.classList.remove("active");
-    adminDashboard.classList.add("hidden");
-  }
-}
+// ==========================================
+// ADMIN EDIT / DELETE EVENTS
+// ==========================================
 
-function openAdminDashboard() {
-  if (!isAdmin) {
-    openAdminLogin();
+adminProfileRows.addEventListener("click", async event => {
+  if (!isAdmin()) return;
+
+  const editButton = event.target.closest("[data-edit]");
+  const deleteButton = event.target.closest("[data-delete]");
+
+  if (editButton) {
+    const id = editButton.dataset.edit;
+
+    const profile = PROFILES.find(
+      p => String(p.id) === String(id)
+    );
+
+    if (profile) {
+      openProfileForm(profile);
+    }
+  }
+
+  if (deleteButton) {
+    const id = deleteButton.dataset.delete;
+
+    if (!confirm("Are you sure you want to delete this profile?")) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, "profiles", String(id)));
+
+      $("dashboardMessage").textContent =
+        "Profile deleted successfully!";
+
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Delete failed: " + error.message);
+    }
+  }
+});
+
+// ==========================================
+// PROFILE GRID EVENTS
+// ==========================================
+
+profileGrid.addEventListener("click", event => {
+  const viewButton = event.target.closest("[data-view]");
+  const favoriteButton = event.target.closest("[data-fav]");
+
+  if (favoriteButton) {
+    toggleFavorite(favoriteButton.dataset.fav);
     return;
   }
 
-  if (adminDashboard) {
-    adminDashboard.classList.remove("hidden");
-    adminDashboard.classList.add("active");
-  }
-
-  renderAdminProfiles();
-}
-
-// IMPORT ORIGINAL 3 SAMPLE PROFILES
-if (importSamplesBtn) {
-  importSamplesBtn.addEventListener("click", async () => {
-    if (!isAdmin) {
-      alert("Please login as admin first.");
-      return;
-    }
-
-    const confirmed = confirm(
-      "Import the original 3 sample profiles into Firebase?"
-    );
-
-    if (!confirmed) return;
-
-    try {
-      importSamplesBtn.disabled = true;
-      importSamplesBtn.textContent = "Importing...";
-
-      for (const profile of SAMPLE_PROFILES) {
-        await setDoc(
-          doc(db, "profiles", String(profile.id)),
-          profile
-        );
-      }
-
-      alert("Original 3 sample profiles imported successfully!");
-
-      closeAdminDashboard();
-      startProfileListener();
-
-    } catch (error) {
-      console.error("Sample import error:", error);
-      alert("Import failed: " + error.message);
-
-    } finally {
-      importSamplesBtn.disabled = false;
-      importSamplesBtn.textContent = "Import Original 3 Sample Profiles";
-    }
-  });
-}
-
-
-// SEARCH AND FILTER EVENTS
-if (searchInput) {
-  searchInput.addEventListener("input", render);
-}
-
-if (districtFilter) {
-  districtFilter.addEventListener("change", render);
-}
-
-if (educationFilter) {
-  educationFilter.addEventListener("change", render);
-}
-
-if (typeFilter) {
-  typeFilter.addEventListener("change", render);
-}
-
-
-// ADMIN BUTTON
-if (adminOpenBtn) {
-  adminOpenBtn.addEventListener("click", () => {
-    if (isAdmin) {
-      openAdminDashboard();
-    } else {
-      openAdminLogin();
-    }
-  });
-}
-
-
-// ADMIN LOGIN
-if (adminLoginForm) {
-  adminLoginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    const email = document.getElementById("adminEmail")?.value.trim();
-    const password = document.getElementById("adminPassword")?.value;
-
-    if (!email || !password) {
-      alert("Enter email and password.");
-      return;
-    }
-
-    try {
-      const result = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-
-      if (result.user.uid !== ADMIN_UID) {
-        await signOut(auth);
-        alert("You are not authorized as admin.");
-        return;
-      }
-
-      isAdmin = true;
-      closeAdminLogin();
-      openAdminDashboard();
-
-    } catch (error) {
-      console.error("Login error:", error);
-      alert("Login failed: " + error.message);
-    }
-  });
-}
-
-
-// AUTH STATE
-onAuthStateChanged(auth, (user) => {
-  isAdmin = Boolean(user && user.uid === ADMIN_UID);
-
-  if (adminOpenBtn) {
-    adminOpenBtn.textContent = isAdmin ? "Admin Dashboard" : "Admin";
+  if (viewButton) {
+    openProfile(viewButton.dataset.view);
   }
 });
 
+// ==========================================
+// PROFILE MODAL CLOSE
+// ==========================================
 
-// CLOSE ADMIN LOGIN
-if (adminLoginModal) {
-  adminLoginModal.addEventListener("click", (event) => {
-    if (
-      event.target === adminLoginModal ||
-      event.target.classList.contains("admin-backdrop")
-    ) {
-      closeAdminLogin();
-    }
+modalClose.addEventListener("click", closeModal);
+
+profileModal.addEventListener("click", event => {
+  if (event.target === profileModal) {
+    closeModal();
+  }
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") {
+    closeModal();
+    closeAdminLogin();
+    closeAdminDashboard();
+  }
+});
+
+// ==========================================
+// SEARCH AND FILTER EVENTS
+// ==========================================
+
+$("searchInput").addEventListener("input", render);
+$("districtFilter").addEventListener("change", render);
+$("educationFilter").addEventListener("change", render);
+$("ageFilter").addEventListener("change", render);
+$("maritalFilter").addEventListener("change", render);
+
+$("resetFilters").addEventListener("click", clearFilters);
+$("emptyReset").addEventListener("click", clearFilters);
+
+document.querySelectorAll(".type-tab").forEach(button => {
+  button.addEventListener("click", () => {
+    selectType(button.dataset.type);
   });
-}
+});
 
-
-// CLOSE ADMIN DASHBOARD
-if (adminDashboard) {
-  adminDashboard.addEventListener("click", (event) => {
-    if (
-      event.target === adminDashboard ||
-      event.target.classList.contains("admin-backdrop")
-    ) {
-      closeAdminDashboard();
-    }
-  });
-}
-
-
-// ADMIN LOGOUT
-if (adminLogoutBtn) {
-  adminLogoutBtn.addEventListener("click", async () => {
-    try {
-      await signOut(auth);
-      isAdmin = false;
-      closeAdminDashboard();
-      alert("Logged out successfully.");
-    } catch (error) {
-      alert("Logout failed: " + error.message);
-    }
-  });
-}
-
-
-// ADD PROFILE BUTTON
-if (addProfileBtn) {
-  addProfileBtn.addEventListener("click", () => {
-    if (!isAdmin) {
-      alert("Please login first.");
-      return;
-    }
-
-    openProfileForm();
-  });
-}
-
-
-// PROFILE FORM SUBMIT
-if (profileForm) {
-  profileForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-
-    if (!isAdmin) {
-      alert("Admin access required.");
-      return;
-    }
-
-    try {
-      const formData = new FormData(profileForm);
-
-      const profile = {
-        id: editingProfileId || String(Date.now()),
-        type: formData.get("type") || "bride",
-        name: formData.get("name") || "",
-        age: Number(formData.get("age") || 0),
-        height: formData.get("height") || "",
-        district: formData.get("district") || "",
-        education: formData.get("education") || "",
-        profession: formData.get("profession") || "",
-        marital: formData.get("marital") || "",
-        family: formData.get("family") || "",
-        about: formData.get("about") || "",
-        preference: formData.get("preference") || "",
-        photo: formData.get("photo") || "",
-        income: formData.get("income") || ""
-      };
-
-      if (!profile.name.trim()) {
-        alert("Please enter profile name.");
-        return;
-      }
-
-      await setDoc(
-        doc(db, "profiles", profile.id),
-        profile
-      );
-
-      alert(
-        editingProfileId
-          ? "Profile updated successfully!"
-          : "New profile added successfully!"
-      );
-
-      editingProfileId = null;
-      profileForm.reset();
-      closeProfileForm();
-      startProfileListener();
-
-    } catch (error) {
-      console.error("Profile save error:", error);
-      alert("Could not save profile: " + error.message);
-    }
-  });
-}
-
-
-// PROFILE GRID CLICK EVENTS
-if (profileGrid) {
-  profileGrid.addEventListener("click", (event) => {
-    const favoriteButton = event.target.closest("[data-favorite]");
-    const viewButton = event.target.closest("[data-view]");
-
-    if (favoriteButton) {
-      const id = favoriteButton.dataset.favorite;
-      toggleFavorite(id);
-      return;
-    }
-
-    if (viewButton) {
-      const id = viewButton.dataset.view;
-      const profile = PROFILES.find(
-        item => String(item.id) === String(id)
-      );
-
-      if (profile) {
-        openProfileDetails(profile);
-      }
-    }
-  });
-}
-
-
-// ADMIN PROFILE TABLE EVENTS
-if (adminProfileRows) {
-  adminProfileRows.addEventListener("click", async (event) => {
-    const editButton = event.target.closest("[data-edit]");
-    const deleteButton = event.target.closest("[data-delete]");
-
-    if (!isAdmin) return;
-
-    if (editButton) {
-      const id = editButton.dataset.edit;
-
-      const profile = PROFILES.find(
-        item => String(item.id) === String(id)
-      );
-
-      if (profile) {
-        editingProfileId = String(profile.id);
-        fillProfileForm(profile);
-        openProfileForm();
-      }
-    }
-
-    if (deleteButton) {
-      const id = deleteButton.dataset.delete;
-
-      if (!confirm("Are you sure you want to delete this profile?")) {
-        return;
-      }
-
-      try {
-        await deleteDoc(doc(db, "profiles", String(id)));
-        alert("Profile deleted successfully!");
-        startProfileListener();
-
-      } catch (error) {
-        console.error("Delete error:", error);
-        alert("Delete failed: " + error.message);
-      }
-    }
-  });
-}
-
-
-// PROFILE DETAILS CLOSE
-if (profileModal) {
-  profileModal.addEventListener("click", (event) => {
-    if (
-      event.target === profileModal ||
-      event.target.classList.contains("modal-backdrop")
-    ) {
-      closeProfileDetails();
-    }
-  });
-}
-
-
-// CONTACT ADMINISTRATION BUTTON
-if (contactButton) {
-  contactButton.href =
-    "https://wa.me/8801928860786?text=" +
-    encodeURIComponent("Hello, I want to contact the administration.");
-}
-
-
+// ==========================================
 // MOBILE MENU
-if (menuToggle && navLinks) {
+// ==========================================
+
+if (menuToggle && mainNav) {
   menuToggle.addEventListener("click", () => {
-    navLinks.classList.toggle("active");
+    mainNav.classList.toggle("open");
+    mainNav.classList.toggle("active");
+
+    const isOpen =
+      mainNav.classList.contains("open") ||
+      mainNav.classList.contains("active");
+
+    menuToggle.setAttribute("aria-expanded", String(isOpen));
+    menuToggle.textContent = isOpen ? "×" : "☰";
+  });
+  mainNav.querySelectorAll("a").forEach(link => {
+    link.addEventListener("click", () => {
+      mainNav.classList.remove("open", "active");
+      menuToggle.setAttribute("aria-expanded", "false");
+      menuToggle.textContent = "☰";
+    });
   });
 }
 
-
+// ==========================================
 // INITIALIZE WEBSITE
+// ==========================================
+
 updateCounts();
 fillFilters();
 render();
