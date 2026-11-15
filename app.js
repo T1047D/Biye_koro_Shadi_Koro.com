@@ -20,7 +20,7 @@ const PROFILES = [
     marital: "Never married", family: "Educated, close-knit family",
     about: " I am a good person, hyper active, talkative, sensitive, funny.",
     preference: "Rich with six pack body , good looking, Understanding, supportive, technically a good person.",
-    photo: "shefa.jpg", income: "00"
+    photo: "Assets/shefa.jpg", income: "00"
   },
   {
     id: 4, type: "groom", name: "Md.Kowsar", age: 19, height: "5'7\"",
