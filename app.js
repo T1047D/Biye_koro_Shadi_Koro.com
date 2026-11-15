@@ -331,12 +331,25 @@ function render() {
           <span>${escapeHTML(p.education)}</span>
         </div>
 
-        <div class="card-bottom">
-          <small>${escapeHTML(p.marital)}</small>
-          <button class="view-btn" data-view="${escapeHTML(p.id)}">
-            View profile ↗
-          </button>
-        </div>
+        
+<div class="card-bottom">
+  <small>${escapeHTML(p.marital)}</small>
+
+  <button class="view-btn" data-view="${escapeHTML(p.id)}">
+    View profile ↗
+  </button>
+
+  ${isAdmin() ? `
+    <button class="table-edit-btn" data-card-edit="${escapeHTML(p.id)}">
+      Edit
+    </button>
+
+    <button class="table-delete-btn" data-card-delete="${escapeHTML(p.id)}">
+      Delete
+    </button>
+  ` : ""}
+</div>
+
       </div>
     </article>
   `).join("");
