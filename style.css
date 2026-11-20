@@ -268,3 +268,21 @@
     flex: 1;
   }
 }
+
+/* Additional administrator email actions */
+.contact-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media(max-width:640px) {
+  .contact-actions {
+    justify-content: flex-start;
+  }
+
+  .contact-actions .btn {
+    margin-top: 20px;
+  }
+}
